@@ -26,76 +26,75 @@ public class BoggleServer {
     
     public static void main(String[] args) {
         try {
-            serverSocket = new ServerSocket(63400);
-            clientSocket = serverSocket.accept();
-            bufferedReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            pw = new PrintWriter(clientSocket.getOutputStream(),true);
-            
             while(true){
+                serverSocket = new ServerSocket(63400);
+                clientSocket = serverSocket.accept();
+                bufferedReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                pw = new PrintWriter(clientSocket.getOutputStream(),true);
+                
                 inputLine = bufferedReader.readLine();
                  
-               if(inputLine!=null){
-                    System.out.println(inputLine);
-
+                if(inputLine!=null){
+                    System.out.println("COMMAND: "+inputLine);
+                    
                     if(inputLine.toLowerCase().contains("lookup1")){
                         System.out.println("Lookup case...");
                         
-                        String val = inputLine.substring(inputLine.indexOf('|')+1);
-                        System.out.println("LOOKUP1: "+val);
+                        String identity = inputLine.substring(inputLine.indexOf('|')+1);
+                        System.out.println("ID: "+identity);
                         
-                        boolean ret = lookupID(val);
-                        if(ret){
-                            System.out.println("Exists.");
-                            pw.println("1");
-                        } else {
-                            System.out.println("Empty");                           
-                            pw.println("0");
+                        boolean found = lookupIdentity(identity);
+                        if(found){
+                            System.out.println("Found!");
+                            pw.println(1);
+                        } else if(!found){
+                            System.out.println("Didn't find!");
+                            pw.println(-1);
                         }
                         
-                        System.out.println("Closing...");
-                        pw.println("-1");
-                        
+                        System.out.println("Exiting lookup1...");
                     } else if(inputLine.toLowerCase().contains("retrieve2")){
-                        System.out.println("Retrieve from identity...");
+                        System.out.println("Retrieve from identity...");                        
                         
-                        String val = inputLine.substring(inputLine.indexOf('|')+1);
-                        System.out.println("RETRIEVE2: "+val);
+                    } else if(inputLine.toLowerCase().contains("insert3")){
+                        List<String> toAdd = new ArrayList<String>();
                         
-                        Set<String> words = retrieveWords(val);
-                        if(!words.isEmpty()){
-                            System.out.println("Found some words");
-                        }
-                        
-                        //TODO: Write response
-                        
-                    } else if(inputLine.toLowerCase().contains("insid3")){
                         System.out.println("Insert ID into tables...");
                         
-                        String val = inputLine.substring(inputLine.indexOf('|')+1);
-                        val = val.substring(0,val.indexOf('|'));
-                        String ss1 = inputLine.substring(inputLine.indexOf('|')+1);
-                        System.out.println(ss1);
-                        ss1 = ss1.substring(ss1.indexOf('|')+1);
-                        System.out.println(ss1);
-                        String ct = ss1.substring(0,ss1.indexOf('|'));
-                        String sc = ss1.substring(ss1.indexOf('|')+1);
+                        String s1 = inputLine.substring(inputLine.indexOf('|')+1);
+                        System.out.println(s1);
+                        String identity = s1.substring(0,s1.indexOf('|'));
+                        String s2 = s1.substring(s1.indexOf('|')+1);
+                        String ct = s2.substring(0,s2.indexOf('|'));
+                        String sc = s2.substring(s2.indexOf('|')+1);
                         
                         int count = Integer.parseInt(ct);
                         int score = Integer.parseInt(sc);
                         
-                        System.out.println("VAL:"+val+" COUNT:"+count+" TEST"+score);
+                        System.out.println("ID: "+identity+" COUNT: "+ct+" SCORE: "+sc);
+                        int check = insertIdentity(identity,count,score);
                         
-                        insertID(val,count,score);
+                        pw.println(check);
                         
-                        System.out.println("Exiting...");
+                        String inline;
+                        while(!(inline = bufferedReader.readLine()).equals("##")){
+                            //System.out.println(inline);
+                            toAdd.add(inline);
+                        }
+                        
+                        check = insertWords(toAdd);
+                        
+                        toAdd.clear();
+                        toAdd = null;
+                        System.out.println("Exiting insert3...");
                     }
                 }
-               System.out.println("----------RESETTING");
-                    serverSocket.close();
-                    serverSocket = new ServerSocket(63400);
-                    clientSocket = serverSocket.accept();
-                    bufferedReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                    pw = new PrintWriter(clientSocket.getOutputStream(),true);
+                
+                System.out.println("----------RESETTING");
+                clientSocket.close();
+                serverSocket.close();
+                bufferedReader.close();
+                pw.close();
             }
         } catch (IOException e){
             System.out.println("ERROR: "+e);   
@@ -104,149 +103,104 @@ public class BoggleServer {
                 serverSocket.close();
                 clientSocket.close();
                 bufferedReader.close();
+                pw.close();
             } catch (Exception e){
                 System.out.println("Are you fucking retarded?\n"+e);
             }
         }
     }
     
-    //MySQL Lookup for identity
-    public static boolean lookupID(String identity){
-        boolean output = false;
-        Connection con = null; //Connection. Ignore
-        Statement st = null; //Execution Statements
-        ResultSet rs = null; //Return values
-        
+    public static boolean lookupIdentity(String id){
+        boolean found = false;
         String url = "jdbc:mysql://localhost:3306/boggleServer?zeroDateTimeBehavior=convertToNull";
         String usr = "root";
         String pwd = "b7rma5137";
         
         try {
+            Connection con = null; //Connection. Ignore
+            Statement st = null; //Execution Statements
+            ResultSet rs = null; //Return values
+            
             con = DriverManager.getConnection(url,usr,pwd);
             st =  con.createStatement();
             
-            String lookup = "SELECT * FROM boardids WHERE identity = \""+identity+"\";";
-            System.out.println("LOOKUP: "+lookup);
-            rs = st.executeQuery(lookup);
+            rs = st.executeQuery("SELECT * FROM boardids WHERE identity='"+id+"';");
             
             while(rs.next()){
-                System.out.println(rs.getString(1)+" "+rs.getString(2));
-                output=true;
+                System.out.println("Found: "+rs.getString(1)+" "+rs.getString(2));
+                found = true;
             }
+            
+            rs.close();
+            st.close();
+            con.close();
             
         } catch (SQLException e){
             System.out.println("SQL EXCEPTION 1: "+e);
-        } finally {
-            try{
-                if(rs!=null){
-                    rs.close();
-                }
-                if(st!=null){
-                    st.close();
-                }
-                if(con!=null){
-                    con.close();
-                }
-            } catch(SQLException e){
-                System.out.println("SQL EXCEPTION 2: "+e);
-            } 
-        }
-        return output;
+        } 
+        
+        return found;
     }
     
-    //Retrieves a set of all possible words of the given identity
-    public static Set<String> retrieveWords(String parentID){
-        Set<String> words = new HashSet<String>();
-        
-        Connection con = null; //Connection. Ignore
-        Statement st = null; //Execution Statements
-        ResultSet rs = null; //Return values
-        
+    public static int insertIdentity(String id, int score, int words){
         String url = "jdbc:mysql://localhost:3306/boggleServer?zeroDateTimeBehavior=convertToNull";
         String usr = "root";
         String pwd = "b7rma5137";
         
         try {
+            Connection con = null; //Connection. Ignore
+            Statement st = null; //Execution Statements
+            //ResultSet rs = null; //Return values
+            
             con = DriverManager.getConnection(url,usr,pwd);
             st =  con.createStatement();
             
-            String lookup = "SELECT * FROM words WHERE parentID = '"+parentID+"';";
-            System.out.println("LOOKUP: "+lookup);
-            rs = st.executeQuery(lookup);
+            st.executeUpdate("INSERT INTO boardids VALUES ('"+id+"',"+score+","+words+");");
             
-            while(rs.next()){
-                System.out.println(rs.getString(1));
-                words.add(rs.getString(1));
-            }
-            
+            //rs.close();
+            st.close();
+            con.close();
         } catch (SQLException e){
             System.out.println("SQL EXCEPTION 1: "+e);
-        } finally {
-            try{
-                if(rs!=null){
-                    rs.close();
-                }
-                if(st!=null){
-                    st.close();
-                }
-                if(con!=null){
-                    con.close();
-                }
-            } catch(SQLException e){
-                System.out.println("SQL EXCEPTION 2: "+e);
-            } 
-        }
+        } 
         
-        return words;
+        return 1;
     }
     
-    //Inserts the ID into the boardids table
-    public static void insertID(String identity, int count, int score){
-        Connection con = null; //Connection. Ignore
-        Statement st = null; //Execution Statements
-        ResultSet rs = null; //Return values
-        
+    public static int insertWords(List<String> entries){
         String url = "jdbc:mysql://localhost:3306/boggleServer?zeroDateTimeBehavior=convertToNull";
         String usr = "root";
         String pwd = "b7rma5137";
         
         try {
+            Connection con = null; //Connection. Ignore
+            Statement st = null; //Execution Statements
+            //ResultSet rs = null; //Return values
+            
             con = DriverManager.getConnection(url,usr,pwd);
             st =  con.createStatement();
             
-            String val = "INSERT INTO boardids VALUES ('"+identity+"',"+count+","+score+");";
-            System.out.println("L:"+val);
-            st.executeUpdate(val);
-            
-            String lookup = "SELECT * FROM boardids;";
-            rs = st.executeQuery(lookup);
-            
-            while(rs.next()){
-                System.out.println(rs.getString(1)+" "+rs.getInt(2)+" "+rs.getInt(3));
+            for(String s : entries){                
+                String word = s.substring(0,s.indexOf('|'));
+                String s1 = s.substring(s.indexOf('|')+1);
+                String pID = s1.substring(0,s1.indexOf('|'));
+                String sc = s1.substring(s1.indexOf('|')+1);
+                int score = Integer.parseInt(sc);
+                
+                //System.out.println("Word: "+word+" pID: "+pID+" SC: "+sc);
+                //System.out.println("INSERT INTO words VALUES ('"+word+"','"+pID+"',"+score+");");
+                st.executeUpdate("INSERT INTO words VALUES ('"+word+"','"+pID+"',"+score+");");
             }
+            //st.executeUpdate("INSERT INTO boardids VALUES ('"+id+"',"+score+","+words+");");
             
+            //rs.close();
+            st.close();
+            con.close();
         } catch (SQLException e){
             System.out.println("SQL EXCEPTION 1: "+e);
-        } finally {
-            try{
-                if(rs!=null){
-                    rs.close();
-                }
-                if(st!=null){
-                    st.close();
-                }
-                if(con!=null){
-                    con.close();
-                }
-            } catch(SQLException e){
-                System.out.println("SQL EXCEPTION 2: "+e);
-            } 
-        }
-    }
-    
-    //Inserts the words into the word table
-    public static void insertWords(){
+        } 
         
+        return 1;
     }
 }
 
