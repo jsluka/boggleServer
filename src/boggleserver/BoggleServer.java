@@ -54,8 +54,20 @@ public class BoggleServer {
                         
                         System.out.println("Exiting lookup1...");
                     } else if(inputLine.toLowerCase().contains("retrieve2")){
-                        System.out.println("Retrieve from identity...");                        
+                        System.out.println("Retrieve from identity...");       
                         
+                        String s1 = inputLine.substring(inputLine.indexOf('|')+1);
+                        
+                        List<String> words = retrieveWords(s1);
+                        
+                        for(String s : words){
+                            //System.out.println(s);
+                            pw.println(s);
+                        }
+                        
+                        pw.println("##");
+                        
+                        System.out.println("Exiting retrieve2...");
                     } else if(inputLine.toLowerCase().contains("insert3")){
                         List<String> toAdd = new ArrayList<String>();
                         
@@ -201,6 +213,39 @@ public class BoggleServer {
         } 
         
         return 1;
+    }
+    
+    public static List<String> retrieveWords(String id){
+        List<String> words = new ArrayList<String>();
+        
+        String url = "jdbc:mysql://localhost:3306/boggleServer?zeroDateTimeBehavior=convertToNull";
+        String usr = "root";
+        String pwd = "b7rma5137";
+        
+        try {
+            Connection con = null; //Connection. Ignore
+            Statement st = null; //Execution Statements
+            ResultSet rs = null; //Return values
+            
+            con = DriverManager.getConnection(url,usr,pwd);
+            st =  con.createStatement();
+            
+            rs = st.executeQuery("SELECT * FROM words WHERE parentID='"+id+"';");
+            
+            while(rs.next()){
+                System.out.println("Found: "+rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3));
+                words.add(rs.getString(1));
+            }
+            
+            rs.close();
+            st.close();
+            con.close();
+            
+        } catch (SQLException e){
+            System.out.println("SQL EXCEPTION 1: "+e);
+        } 
+        
+        return words;
     }
 }
 
